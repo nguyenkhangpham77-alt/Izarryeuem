@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link4M Key Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .key-display {
+            background: #f8f9fa;
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #333;
+            word-break: break-all;
+            transition: all 0.3s;
+        }
+        .key-display.has-key {
+            border-color: #4CAF50;
+            background: #e8f5e9;
+        }
+        .key-display .key-text {
+            font-weight: bold;
+            color: #2e7d32;
+            font-size: 20px;
+        }
+        .status {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .status.active {
+            background: #4CAF50;
+            color: white;
+        }
+        .status.expired {
+            background: #f44336;
+            color: white;
+        }
+        .status.waiting {
+            background: #ff9800;
+            color: white;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 5px;
+            width: 100%;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .btn-success {
+            background: #4CAF50;
+        }
+        .btn-success:hover {
+            background: #45a049;
+        }
+        .timer {
+            font-size: 14px;
+            color: #666;
+            margin: 15px 0;
+        }
+        .timer span {
+            font-weight: bold;
+            color: #333;
+        }
+        .info {
+            font-size: 12px;
+            color: #999;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        .device-id {
+            font-size: 12px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        .alert {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔑 Link4M Key Generator</h1>
+        <p class="subtitle">Tạo key tự động - Hiệu lực 48 giờ</p>
+
+        <div id="deviceInfo" class="device-id"></div>
+
+        <div id="statusBadge" class="status waiting">⏳ Đang chờ...</div>
+
+        <div id="keyDisplay" class="key-display">
+            <span>Chưa có key</span>
+        </div>
+
+        <div id="timerDisplay" class="timer">
+            ⏱️ Thời gian còn lại: <span id="countdown">--:--:--</span>
+        </div>
+
+        <div id="alertMessage" class="alert" style="display:none;"></div>
+
+        <button id="getKeyBtn" class="btn btn-success">
+            🚀 Lấy Key Ngay
+        </button>
+
+        <button id="copyKeyBtn" class="btn btn-secondary" style="display:none; margin-top:10px;">
+            📋 Sao chép Key
+        </button>
+
+        <div class="info">
+            <p>⚠️ Mỗi key chỉ dùng được cho <strong>1 máy duy nhất</strong></p>
+            <p>⏰ Key tự động hết hạn sau 48 giờ</p>
+            <p>🔄 Sau khi hết hạn, tự động reset để lấy key mới</p>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        const API_URL = 'https://link4m.co/st?api=6a130f0fcf215b48321d14fc&url=yourdestinationlink.com';
+        const KEY_EXPIRY_HOURS = 48;
+        const KEY_EXPIRY_MS = KEY_EXPIRY_HOURS * 60 * 60 * 1000;
+
+        // ===== STATE MANAGEMENT =====
+        let currentKey = null;
+        let keyExpiryTime = null;
+        let countdownInterval = null;
+        let deviceId = null;
+
+        // ===== DEVICE ID (Unique per machine) =====
+        function getDeviceId() {
+            let id = localStorage.getItem('link4m_device_id');
+            if (!id) {
+                id = 'DEV_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+                localStorage.setItem('link4m_device_id', id);
+            }
+            return id;
+        }
+
+        // ===== DOM Elements =====
+        const keyDisplay = document.getElementById('keyDisplay');
+        const statusBadge = document.getElementById('statusBadge');
+        const countdownEl = document.getElementById('countdown');
+        const getKeyBtn = document.getElementById('getKeyBtn');
+        const copyKeyBtn = document.getElementById('copyKeyBtn');
+        const alertMessage = document.getElementById('alertMessage');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const deviceInfo = document.getElementById('deviceInfo');
+
+        // ===== Helper Functions =====
+        function showAlert(message, type = 'success') {
+            alertMessage.style.display = 'block';
+            alertMessage.className = `alert alert-${type}`;
+            alertMessage.textContent = message;
+            setTimeout(() => {
+                alertMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        function formatTime(ms) {
+            if (ms <= 0) return '00:00:00';
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function updateStatus(status, message) {
+            statusBadge.textContent = message;
+            statusBadge.className = `status ${status}`;
+        }
+
+        // ===== Key Management =====
+        function saveKey(key, expiryTime) {
+            localStorage.setItem('link4m_key', key);
+            localStorage.setItem('link4m_expiry', expiryTime);
+            localStorage.setItem('link4m_device', deviceId);
+        }
+
+        function loadKey() {
+            const key = localStorage.getItem('link4m_key');
+            const expiry = localStorage.getItem('link4m_expiry');
+            const savedDevice = localStorage.getItem('link4m_device');
+            
+            // Check if key belongs to this device
+            if (savedDevice && savedDevice !== deviceId) {
+                // Key belongs to another device
+                localStorage.removeItem('link4m_key');
+                localStorage.removeItem('link4m_expiry');
+                return null;
+            }
+
+            if (key && expiry) {
+                const expiryTime = parseInt(expiry);
+                if (Date.now() < expiryTime) {
+                    return { key, expiryTime };
+                } else {
+                    // Key expired
+                    localStorage.removeItem('link4m_key');
+                    localStorage.removeItem('link4m_expiry');
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        function clearKey() {
+            localStorage.removeItem('link4m_key');
+            localStorage.removeItem('link4m_expiry');
+            currentKey = null;
+            keyExpiryTime = null;
+            updateUI();
+        }
+
+        // ===== API Call =====
+        async function fetchKey() {
+            try {
+                getKeyBtn.disabled = true;
+                getKeyBtn.textContent = '⏳ Đang lấy key...';
+                updateStatus('waiting', '⏳ Đang lấy key...');
+
+                // Generate unique URL with device ID
+                const url = `${API_URL}&device=${deviceId}&t=${Date.now()}`;
+                
+                // Simulate API call (replace with actual fetch)
+                // Since this is a demo, we'll simulate a response
+                // In production, replace with: const response = await fetch(url);
+                
+                // === SIMULATED API RESPONSE ===
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                const simulatedKey = `KEY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+                // === END SIMULATION ===
+                
+                // For actual API:
+                // const response = await fetch(url);
+                // const data = await response.json();
+                // const newKey = data.key || data.result || data.data?.key;
+                
+                const newKey = simulatedKey; // Replace with actual response handling
+                
+                if (!newKey) {
+                    throw new Error('Không thể lấy key từ server');
+                }
+
+                currentKey = newKey;
+                keyExpiryTime = Date.now() + KEY_EXPIRY_MS;
+                saveKey(currentKey, keyExpiryTime);
+                
+                showAlert('✅ Key đã được tạo thành công!', 'success');
+                updateUI();
+                
+            } catch (error) {
+                console.error('Error fetching key:', error);
+                showAlert('❌ Lỗi: ' + error.message, 'danger');
+                updateStatus('expired', '❌ Lỗi lấy key');
+            } finally {
+                getKeyBtn.disabled = false;
+                getKeyBtn.textContent = '🚀 Lấy Key Ngay';
+            }
+        }
+
+        // ===== Copy Function =====
+        function copyKey() {
+            if (!currentKey) {
+                showAlert('❌ Chưa có key để sao chép!', 'danger');
+                return;
+            }
+            
+            navigator.clipboard.writeText(currentKey).then(() => {
+                showAlert('✅ Đã sao chép key vào clipboard!', 'success');
+            }).catch(() => {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = currentKey;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showAlert('✅ Đã sao chép key!', 'success');
+            });
+        }
+
+        // ===== UI Update =====
+        function updateUI() {
+            const saved = loadKey();
+            
+            if (saved) {
+                currentKey = saved.key;
+                keyExpiryTime = saved.expiryTime;
+                
+                keyDisplay.innerHTML = `<span class="key-text">${currentKey}</span>`;
+                keyDisplay.className = 'key-display has-key';
+                
+                updateStatus('active', '✅ Key đang hoạt động');
+                copyKeyBtn.style.display = 'block';
+                getKeyBtn.textContent = '🔄 Lấy Key Mới';
+                
+                // Start countdown
+                startCountdown();
+            } else {
+                currentKey = null;
+                keyExpiryTime = null;
+                
+                keyDisplay.innerHTML = '<span>Chưa có key</span>';
+                keyDisplay.className = 'key-display';
+                
+                updateStatus('waiting', '⏳ Chưa có key');
+                copyKeyBtn.style.display = 'none';
+                getKeyBtn.textContent = '🚀 Lấy Key Ngay';
+                countdownEl.textContent = '--:--:--';
+                
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+            }
+        }
+
+        function startCountdown() {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+            
+            countdownInterval = setInterval(() => {
+                if (!keyExpiryTime) {
+                    clearInterval(countdownInterval);
+                    return;
+                }
+                
+                const now = Date.now();
+                const remaining = keyExpiryTime - now;
+                
+                if (remaining <= 0) {
+                    // Key expired
+                    clearInterval(countdownInterval);
+                    countdownEl.textContent = '00:00:00';
+                    showAlert('⏰ Key đã hết hạn! Vui lòng lấy key mới.', 'warning');
+                    clearKey();
+                    updateUI();
+                    return;
+                }
+                
+                countdownEl.textContent = formatTime(remaining);
+                
+                // Warning when less than 1 hour
+                if (remaining < 3600000) {
+                    countdownEl.style.color = '#f44336';
+                } else {
+                    countdownEl.style.color = '#333';
+                }
+            }, 1000);
+        }
+
+        // ===== Event Listeners =====
+        getKeyBtn.addEventListener('click', () => {
+            // Check if key exists and is valid
+            const saved = loadKey();
+            if (saved) {
+                if (confirm('Key hiện tại vẫn còn hiệu lực. Bạn có muốn tạo key mới không?')) {
+                    clearKey();
+                    fetchKey();
+                }
+            } else {
+                fetchKey();
+            }
+        });
+
+        copyKeyBtn.addEventListener('click', copyKey);
+
+        // ===== Initialize =====
+        function init() {
+            deviceId = getDeviceId();
+            deviceInfo.textContent = `🖥️ Device: ${deviceId}`;
+            
+            // Check for existing valid key
+            const saved = loadKey();
+            if (saved) {
+                currentKey = saved.key;
+                keyExpiryTime = saved.expiryTime;
+                updateUI();
+            } else {
+                updateUI();
+                // Auto-fetch on first load
+                setTimeout(() => {
+                    fetchKey();
+                }, 1000);
+            }
+
+            // Check expiry on page visibility change
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    const saved = loadKey();
+                    if (!saved && currentKey) {
+                        // Key expired while page was hidden
+                        updateUI();
+                    }
+                }
+            });
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
