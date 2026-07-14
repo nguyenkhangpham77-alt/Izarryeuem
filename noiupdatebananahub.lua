@@ -3969,6 +3969,19 @@ SetAutoFarm:AddToggle("BringMob", {
     end
 })
 
+SetAutoFarm:AddToggle("WalkOnWater", {
+	Title = "Walk On Water",
+    Default = false,
+    Callback = function(Value)
+        _G.WalkWater_Part = Value
+            if _G.WalkWater_Part then
+                game:GetService("Workspace").Map["WaterBase-Plane"].Size = Vector3.new(1000, 112, 1000)
+            else
+                game:GetService("Workspace").Map["WaterBase-Plane"].Size = Vector3.new(1000, 80, 1000)
+            end
+        end
+    })
+
 SetAutoFarm:AddSlider({
     Title = "Speed Tween",
     Min = 350,
@@ -4316,16 +4329,28 @@ spawn(function()
         if _G.StartFarm and _G.MethodSelect == "Farm Bones" then
             pcall(function()        
                 local player = game.Players.LocalPlayer
-                local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                local char = player.Character
+                if not char then return end
+                
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                
                 local questUI = player.PlayerGui:FindFirstChild("Main") and player.PlayerGui.Main:FindFirstChild("Quest")
                 local BonesTable = {"Reborn Skeleton","Living Zombie","Demonic Soul","Posessed Mummy"}
+                local enemies = workspace:FindFirstChild("Enemies")
                 
-                if not root then return end
+                if not enemies then
+                    task.wait(0.5)
+                    return
+                end
                 
                 -- NHẬN QUEST
                 if _G.AcceptQuestC and questUI and not questUI.Visible then
                     local questPos = CFrame.new(-9516.99316, 172.017181, 6078.46533, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-                    _tp(questPos)
+                    
+                    if type(_tp) == "function" then
+                        _tp(questPos)
+                    end
                     
                     local attempts = 0
                     while attempts < 50 and (questPos.Position - root.Position).Magnitude > 50 do
@@ -4333,24 +4358,30 @@ spawn(function()
                         attempts = attempts + 1
                     end
                     
-                    local randomQuest = math.random(1, 4)
                     local questData = {
-                        [1] = {"StartQuest", "HauntedQuest2", 2},
-                        [2] = {"StartQuest", "HauntedQuest2", 1},
-                        [3] = {"StartQuest", "HauntedQuest1", 1},
-                        [4] = {"StartQuest", "HauntedQuest1", 2}
+                        {"StartQuest", "HauntedQuest2", 2},
+                        {"StartQuest", "HauntedQuest2", 1},
+                        {"StartQuest", "HauntedQuest1", 1},
+                        {"StartQuest", "HauntedQuest1", 2}
                     }                    
                     
                     pcall(function()
-                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(questData[randomQuest]))
+                        game.ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(questData[math.random(1, 4)]))
                     end)
                 end
                 
-                -- ===== ĐÁNH LIÊN TỤC KHÔNG NGỪNG =====
+                -- ===== ĐÁNH LIÊN TỤC CÓ KIỂM TRA THOÁT =====
+                local noMobCount = 0
                 while _G.StartFarm do
+                    -- Kiểm tra quest đã hoàn thành chưa
+                    if questUI and questUI.Visible and questUI:FindFirstChild("Finish") then
+                        break -- Quest đã xong, thoát vòng lặp
+                    end
+                    
                     local targetBone = nil
                     
-                    for _, v in pairs(workspace.Enemies:GetChildren()) do
+                    -- Tìm mob còn sống
+                    for _, v in pairs(enemies:GetChildren()) do
                         if table.find(BonesTable, v.Name)
                            and v:FindFirstChild("Humanoid")
                            and v:FindFirstChild("HumanoidRootPart")
@@ -4360,11 +4391,19 @@ spawn(function()
                         end
                     end
                     
-                    if targetBone then
+                    if targetBone and type(Attack.Kill) == "function" then
                         Attack.Kill(targetBone, _G.StartFarm)
+                        noMobCount = 0 -- Reset counter khi có mob
+                    else
+                        noMobCount = noMobCount + 1
+                        -- Nếu không có mob trong 10 giây, nghỉ 1 chút rồi thử lại
+                        if noMobCount >= 10 then
+                            task.wait(2)
+                            noMobCount = 0
+                        end
                     end
                     
-                    task.wait() -- Chờ 1 frame rồi đánh tiếp
+                    task.wait() -- Chờ 1 frame
                 end
             end)
         end
@@ -4390,7 +4429,10 @@ spawn(function()
         if _G.StartFarm and _G.MethodSelect == "Farm Katakuri" then
             pcall(function()
                 local player = game.Players.LocalPlayer
-                local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                local char = player.Character
+                if not char then return end
+                
+                local root = char:FindFirstChild("HumanoidRootPart")
                 if not root then return end
 
                 local questUI = player.PlayerGui:FindFirstChild("Main") and player.PlayerGui.Main:FindFirstChild("Quest")
@@ -4402,29 +4444,32 @@ spawn(function()
                 local mirrorOther = bigMirror and bigMirror:FindFirstChild("Other")
 
                 if not mirrorOther then
-                    _tp(CFrame.new(-2077, 252, -12373))
+                    if type(_tp) == "function" then
+                        _tp(CFrame.new(-2077, 252, -12373))
+                    end
                     return
                 end
 
                 if mirrorOther.Transparency == 0 or enemies:FindFirstChild("Cake Prince") then
-                    local v = GetConnectionEnemies("Cake Prince")
-                    if v then
+                    local v = GetConnectionEnemies and GetConnectionEnemies("Cake Prince")
+                    if v and type(Attack.Kill2) == "function" then
                         repeat
-                            wait()
+                            task.wait()
                             Attack.Kill2(v, _G.StartFarm)
                         until not _G.StartFarm or not v.Parent or not v:FindFirstChild("Humanoid") or v.Humanoid.Health <= 0
                     end
                 else
                     local mobNames = {"Cookie Crafter", "Cake Guard", "Baking Staff", "Head Baker"}
                     
-                    -- NHẬN QUEST
                     if _G.AcceptQuestC and questUI and not questUI.Visible then
                         local questPos = CFrame.new(-1927.92, 37.8, -12842.54)
-                        _tp(questPos)
+                        if type(_tp) == "function" then
+                            _tp(questPos)
+                        end
                         
                         local attempts = 0
                         while attempts < 50 and (questPos.Position - root.Position).Magnitude > 50 do
-                            wait(0.2)
+                            task.wait(0.2)
                             attempts = attempts + 1
                         end
 
@@ -4439,10 +4484,14 @@ spawn(function()
                         end)
                     end
                     
-                    -- ===== ĐÁNH LIÊN TỤC KHÔNG NGỪNG =====
+                    -- ===== ĐÁNH LIÊN TỤC CÓ KIỂM TRA =====
                     while _G.StartFarm do
-                        local targetMob = nil
+                        -- Kiểm tra thoát sớm
+                        if mirrorOther.Transparency == 0 or enemies:FindFirstChild("Cake Prince") then
+                            break
+                        end
                         
+                        local targetMob = nil
                         for _, v in pairs(enemies:GetChildren()) do
                             if table.find(mobNames, v.Name) 
                                and v:FindFirstChild("Humanoid") 
@@ -4452,15 +4501,11 @@ spawn(function()
                             end
                         end
                         
-                        if targetMob then
+                        if targetMob and type(Attack.Kill) == "function" then
                             Attack.Kill(targetMob, _G.StartFarm)
                         end
                         
-                        if mirrorOther.Transparency == 0 or enemies:FindFirstChild("Cake Prince") then
-                            break
-                        end
-                        
-                        task.wait() -- Chờ 1 frame rồi đánh tiếp
+                        task.wait() -- Chờ 1 frame
                     end
                 end
             end)
@@ -10334,16 +10379,3 @@ game:GetService('Players').LocalPlayer.CharacterAdded:Connect(function(character
         character.Humanoid.JumpPower = getgenv().JumpValue
     end
 end)
-
-MiscPVP:AddToggle("WalkOnWater", {
-    Title = "Walk On Water",
-    Default = false,
-    Callback = function(Value)
-        _G.WalkWater_Part = Value
-            if _G.WalkWater_Part then
-                game:GetService("Workspace").Map["WaterBase-Plane"].Size = Vector3.new(1000, 112, 1000)
-            else
-                game:GetService("Workspace").Map["WaterBase-Plane"].Size = Vector3.new(1000, 80, 1000)
-            end
-        end
-    })
