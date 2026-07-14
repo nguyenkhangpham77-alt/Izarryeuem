@@ -4715,69 +4715,299 @@ end)
 
 MeterialFarm = AutoModeFarm:AddLeftGroupbox("Farming Meterial")
 
-if World1 then MaterialList = {"Leather + Scrap Metal", "Angel Wings", "Magma Ore", "Fish Tail"}
-elseif World2 then MaterialList = {"Leather + Scrap Metal", "Radioactive Material", "Ectoplasm", "Mystic Droplet", "Magma Ore", "Vampire Fang"}
-elseif World3 then MaterialList = {"Scrap Metal", "Demonic Wisp", "Conjured Cocoa", "Dragon Scale", "Gunpowder", "Fish Tail", "Mini Tusk"}
+-- Cập nhật danh sách nguyên liệu
+local MaterialList = {}
+if World1 then
+    MaterialList = {"Leather + Scrap Metal", "Angel Wings", "Magma Ore", "Fish Tail"}
+elseif World2 then
+    MaterialList = {"Leather + Scrap Metal", "Radioactive Material", "Ectoplasm", "Mystic Droplet", "Magma Ore", "Vampire Fang"}
+elseif World3 then
+    MaterialList = {"Scrap Metal", "Demonic Wisp", "Conjured Cocoa", "Dragon Scale", "Gunpowder", "Fish Tail", "Mini Tusk"}
 end
 
-MeterialFarm:AddDropdown("SelectMethodFarm", {
-    Title = "Select Meterial",
+MeterialFarm:AddDropdown("SelectMaterial", {
+    Title = "Select Material",
     Values = MaterialList,
-    Default = nil,
+    Default = MaterialList[1] or "",
     Callback = function(Value)
-        _G.SelectMaterial = Value
-        SelectMaterial = Value
+        getgenv().SelectMaterial = Value
+        print("[Material Farm] Đã chọn: " .. Value)
     end
 })
 
-MeterialFarm:AddToggle("MeterialStart", {
-    Title = "Farm Meterial",
+MeterialFarm:AddToggle("AutoMaterial", {
+    Title = "Farm Material",
     Default = false,
     Callback = function(Value)
-        _G.AutoMaterial = Value
-        if not _G.StartFarm then
+        getgenv().AutoMaterial = Value
+        if Value then
             Library:Notify({
                 Title = "Banana Cat Hub",
-                Description = "Open Start Farm Plz!",
+                Description = "Đang farm: " .. getgenv().SelectMaterial,
                 Duration = 3
+            })
+            -- Tự động bật StartFarm nếu chưa bật
+            if not getgenv().StartFarm then
+                getgenv().StartFarm = true
+            end
+        else
+            Library:Notify({
+                Title = "Banana Cat Hub",
+                Description = "Đã dừng farm material",
+                Duration = 2
             })
         end
     end
 })
 
-spawn(function()
-    while wait(0.5) do
-        if not _G.AutoMaterial or not _G.StartFarm then continue end
+-- Thêm label hiển thị trạng thái
+local MaterialStatus = MeterialFarm:AddLabel("Trạng thái: Đang chờ...")
+
+-- Cập nhật trạng thái
+task.spawn(function()
+    while task.wait(1) do
         pcall(function()
-            SelectMaterial = _G.SelectMaterial
-            if not SelectMaterial then return end
-
-            MaterialMon()
-            if not MMon or not MPos then return end
-
-            local foundMob = nil
-            for _, EnemyName in ipairs(MMon) do
-                for _, v in pairs(workspace.Enemies:GetChildren()) do
-                    if v.Name == EnemyName and
-                       v:FindFirstChild("Humanoid") and
-                       v:FindFirstChild("HumanoidRootPart") and
-                       v.Humanoid.Health > 0 then
-                        foundMob = v
-                        break
+            if getgenv().AutoMaterial then
+                local matInfo = GetMaterialInfo()
+                if matInfo and matInfo.MMon and #matInfo.MMon > 0 then
+                    local mobNames = table.concat(matInfo.MMon, ", ")
+                    local hasMob = HasMaterialMobs(matInfo.MMon)
+                    if hasMob then
+                        MaterialStatus:SetText("🟢 Đang farm: " .. mobNames)
+                    else
+                        MaterialStatus:SetText("🟡 Đang di chuyển đến vị trí spawn...")
                     end
+                else
+                    MaterialStatus:SetText("🔴 Không tìm thấy nguyên liệu!")
                 end
-                if foundMob then break end
-            end
-
-            if foundMob then
-                -- Chỉ gọi 1 lần Attack.Kill mỗi tick, không repeat
-                Attack.Kill(foundMob, _G.AutoMaterial)
             else
-                _tp(MPos)
+                MaterialStatus:SetText("⚪ Đã dừng")
             end
         end)
     end
 end)
+
+getgenv().AutoMaterial = false
+getgenv().SelectMaterial = "Leather + Scrap Metal"
+
+-- Danh sách nguyên liệu theo từng world
+local MaterialList = {}
+if World1 then
+    MaterialList = {"Leather + Scrap Metal", "Angel Wings", "Magma Ore", "Fish Tail"}
+elseif World2 then
+    MaterialList = {"Leather + Scrap Metal", "Radioactive Material", "Ectoplasm", "Mystic Droplet", "Magma Ore", "Vampire Fang"}
+elseif World3 then
+    MaterialList = {"Scrap Metal", "Demonic Wisp", "Conjured Cocoa", "Dragon Scale", "Gunpowder", "Fish Tail", "Mini Tusk"}
+end
+
+-- Hàm lấy thông tin nguyên liệu (FIX)
+function GetMaterialInfo()
+    local result = {
+        MMon = {},
+        MPos = nil,
+        SP = "Default",
+        QuestName = nil,
+        QuestData = nil,
+        NeedEntrance = nil,
+        EntrancePos = nil
+    }
+    
+    local SelectMaterial = getgenv().SelectMaterial or "Leather + Scrap Metal"
+    
+    if World1 then
+        if SelectMaterial == "Angel Wings" then
+            result.MMon = {"Shanda", "Royal Squad", "Royal Soldier", "Wysper", "Thunder God"}
+            result.MPos = CFrame.new(-4698, 845, -1912)
+            result.EntrancePos = Vector3.new(-4607.82275, 872.54248, -1667.55688)
+            result.NeedEntrance = true
+        elseif SelectMaterial == "Leather + Scrap Metal" then
+            result.MMon = {"Brute", "Pirate"}
+            result.MPos = CFrame.new(-1145, 15, 4350)
+        elseif SelectMaterial == "Magma Ore" then
+            result.MMon = {"Military Soldier", "Military Spy", "Magma Admiral"}
+            result.MPos = CFrame.new(-5815, 84, 8820)
+        elseif SelectMaterial == "Fish Tail" then
+            result.MMon = {"Fishman Warrior", "Fishman Commando", "Fishman Lord"}
+            result.MPos = CFrame.new(61123, 19, 1569)
+            result.EntrancePos = Vector3.new(61163.8515625, 5.342342376708984, 1819.7841796875)
+            result.NeedEntrance = true
+        end
+    elseif World2 then
+        if SelectMaterial == "Leather + Scrap Metal" then
+            result.MMon = {"Marine Captain"}
+            result.MPos = CFrame.new(-2010.5059814453125, 73.00115966796875, -3326.620849609375)
+        elseif SelectMaterial == "Magma Ore" then
+            result.MMon = {"Magma Ninja", "Lava Pirate"}
+            result.MPos = CFrame.new(-5428, 78, -5959)
+        elseif SelectMaterial == "Ectoplasm" then
+            result.MMon = {"Ship Deckhand", "Ship Engineer", "Ship Steward", "Ship Officer"}
+            result.MPos = CFrame.new(911.35827636719, 125.95812988281, 33159.5390625)
+            result.EntrancePos = Vector3.new(61163.8515625, 5.342342376708984, 1819.7841796875)
+            result.NeedEntrance = true
+        elseif SelectMaterial == "Mystic Droplet" then
+            result.MMon = {"Water Fighter"}
+            result.MPos = CFrame.new(-3385, 239, -10542)
+        elseif SelectMaterial == "Radioactive Material" then
+            result.MMon = {"Factory Staff"}
+            result.MPos = CFrame.new(295, 73, -56)
+        elseif SelectMaterial == "Vampire Fang" then
+            result.MMon = {"Vampire"}
+            result.MPos = CFrame.new(-6033, 7, -1317)
+        end
+    elseif World3 then
+        if SelectMaterial == "Scrap Metal" then
+            result.MMon = {"Jungle Pirate", "Forest Pirate"}
+            result.MPos = CFrame.new(-11975.78515625, 331.7734069824219, -10620.0302734375)
+        elseif SelectMaterial == "Fish Tail" then
+            result.MMon = {"Fishman Raider", "Fishman Captain"}
+            result.MPos = CFrame.new(-10993, 332, -8940)
+        elseif SelectMaterial == "Conjured Cocoa" then
+            result.MMon = {"Chocolate Bar Battler", "Cocoa Warrior"}
+            result.MPos = CFrame.new(620.6344604492188, 78.93644714355469, -12581.369140625)
+        elseif SelectMaterial == "Dragon Scale" then
+            result.MMon = {"Dragon Crew Archer", "Dragon Crew Warrior"}
+            result.MPos = CFrame.new(6594, 383, 139)
+        elseif SelectMaterial == "Gunpowder" then
+            result.MMon = {"Pistol Billionaire"}
+            result.MPos = CFrame.new(-84.8556900024414, 85.62061309814453, 6132.0087890625)
+        elseif SelectMaterial == "Mini Tusk" then
+            result.MMon = {"Mythological Pirate"}
+            result.MPos = CFrame.new(-13545, 470, -6917)
+        elseif SelectMaterial == "Demonic Wisp" then
+            result.MMon = {"Demonic Soul"}
+            result.MPos = CFrame.new(-9495.6806640625, 453.58624267578125, 5977.3486328125)
+        end
+    end
+    
+    return result
+end
+
+-- Hàm tìm quái vật gần nhất
+local function FindNearestMaterialMob(mobNames, maxDistance)
+    if not mobNames or #mobNames == 0 then return nil end
+    
+    local character = game.Players.LocalPlayer.Character
+    if not character then return nil end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return nil end
+    
+    local nearest = nil
+    local nearestDist = maxDistance or 10000
+    
+    for _, v in pairs(workspace.Enemies:GetChildren()) do
+        if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") then
+            if v.Humanoid.Health > 0 then
+                for _, mobName in ipairs(mobNames) do
+                    if v.Name == mobName then
+                        local dist = (v.HumanoidRootPart.Position - rootPart.Position).Magnitude
+                        if dist < nearestDist then
+                            nearestDist = dist
+                            nearest = v
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
+    return nearest
+end
+
+-- Hàm kiểm tra xem có quái vật cần farm không
+local function HasMaterialMobs(mobNames)
+    if not mobNames or #mobNames == 0 then return false end
+    
+    for _, v in pairs(workspace.Enemies:GetChildren()) do
+        if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+            for _, mobName in ipairs(mobNames) do
+                if v.Name == mobName then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- MAIN MATERIAL FARM LOOP (FIX)
+spawn(function()
+    local lastMobCheck = 0
+    local checkInterval = 0.5
+    
+    while task.wait(0.1) do
+        if not getgenv().AutoMaterial then 
+            task.wait(1)
+            continue 
+        end
+        
+        pcall(function()
+            local character = game.Players.LocalPlayer.Character
+            if not character then return end
+            
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if not rootPart then return end
+            
+            -- Lấy thông tin nguyên liệu
+            local matInfo = GetMaterialInfo()
+            if not matInfo or not matInfo.MMon or #matInfo.MMon == 0 then
+                task.wait(1)
+                return
+            end
+            
+            -- Xử lý entrance nếu cần
+            if matInfo.NeedEntrance and matInfo.EntrancePos then
+                local distToEntrance = (rootPart.Position - matInfo.EntrancePos).Magnitude
+                if distToEntrance > 2000 then
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("requestEntrance", matInfo.EntrancePos)
+                    end)
+                    task.wait(0.5)
+                end
+            end
+            
+            -- Tìm quái vật gần nhất
+            local target = FindNearestMaterialMob(matInfo.MMon, 10000)
+            
+            if target then
+                -- Có quái vật -> đánh
+                local targetRoot = target:FindFirstChild("HumanoidRootPart")
+                if targetRoot then
+                    -- Freeze mob
+                    targetRoot.CanCollide = false
+                    if target:FindFirstChild("Humanoid") then
+                        target.Humanoid.WalkSpeed = 0
+                        target.Humanoid.JumpPower = 0
+                    end
+                    
+                    -- Tấn công
+                    Attack.Kill(target, getgenv().AutoMaterial)
+                end
+            else
+                -- Không có quái vật -> teleport đến vị trí spawn
+                if matInfo.MPos then
+                    local distToPos = (rootPart.Position - matInfo.MPos.Position).Magnitude
+                    if distToPos > 50 then
+                        _tp(matInfo.MPos)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- Tự động bật/tắt farm khi chọn nguyên liệu
+task.spawn(function()
+    while task.wait(1) do
+        if getgenv().AutoMaterial and not getgenv().StartFarm then
+            -- Có thể tự động bật StartFarm nếu cần
+            -- getgenv().StartFarm = true
+        end
+    end
+end)
+
+print("[Material Farm] Đã fix xong!")
 
 Stack = Window:AddTab("Stack Farming")
 
@@ -6644,100 +6874,6 @@ RaidOpen:AddToggle("RaidFarming", {
     Default = false,
     Callback = function(Value)
         _G.Raiding = Value
-spawn(function()
-    while task.wait(Sec or 0.5) do
-        if _G.Auto_StartRaid then
-            pcall(function()
-                if plr.PlayerGui.Main.TopHUDList.RaidTimer.Visible == false and GetBP("Special Microchip") then
-                    if World2 then
-                        if _tp then _tp(CFrame.new(-6438.73, 250.64, -4501.50)) end
-                        fireclickdetector(workspace.Map.CircleIsland.RaidSummon2.Button.Main.ClickDetector)
-                    elseif World3 then                   
-                        CommF:InvokeServer("requestEntrance", Vector3.new(-5097.93, 316.44, -3142.66))
-                        fireclickdetector(workspace.Map["Boat Castle"].RaidSummon2.Button.Main.ClickDetector)
-                    end
-                end
-            end)
-        end
-    end
-end)
-
-spawn(function()
-    while task.wait(Sec or 0.1) do
-        if _G.Raiding then  
-            pcall(function()
-                if plr.PlayerGui.Main.TopHUDList.RaidTimer.Visible == true then          
-                    local islands = {"Island5", "Island 4", "Island 3", "Island 2", "Island 1"}
-                    for _, island in ipairs(islands) do
-                        local location = game:GetService("Workspace")["_WorldOrigin"].Locations:FindFirstChild(island)
-                        if location then
-                            for _, v in pairs(workspace.Enemies:GetChildren()) do
-                                if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-                                    repeat task.wait() 
-                                        Attack.Kill(v, _G.Raiding) 
-                                        NextIs = false 
-                                    until not _G.Raiding or not v.Parent or v.Humanoid.Health <= 0 
-                                    NextIs = true
-                                end
-                            end
-                        end
-                    end
-                else
-                    NextIs = false
-                end
-            end)
-        else
-            NextIs = false
-        end
-    end
-end)
-
-spawn(function()
-    while task.wait(Sec or 0.2) do
-        if NextIs and _tp then
-            pcall(function()
-                if plr.PlayerGui.Main.TopHUDList.RaidTimer.Visible == true then
-                    local locs = game:GetService("Workspace")["_WorldOrigin"].Locations
-                    if locs:FindFirstChild("Island 5") then _tp(locs["Island 5"].CFrame * CFrame.new(0, 50, 100))
-                    elseif locs:FindFirstChild("Island 4") then _tp(locs["Island 4"].CFrame * CFrame.new(0, 50, 100))
-                    elseif locs:FindFirstChild("Island 3") then _tp(locs["Island 3"].CFrame * CFrame.new(0, 50, 100))
-                    elseif locs:FindFirstChild("Island 2") then _tp(locs["Island 2"].CFrame * CFrame.new(0, 50, 100))
-                    elseif locs:FindFirstChild("Island 1") then _tp(locs["Island 1"].CFrame * CFrame.new(0, 50, 100))
-                    end
-                end
-            end)
-        end
-    end
-end)
-
-RaidOpen:AddToggle("KillAura", {
-    Title = "Kill aura",
-    Default = false,
-    Callback = function(Value)
-        _G.KillH = Value
-    end
-})
-
-spawn(function()
-    while task.wait(Sec or 0.1) do
-        if _G.KillH then
-            for _, v in pairs(workspace.Enemies:GetChildren()) do
-                if Attack.Alive(v) then
-                    pcall(function()
-                        repeat task.wait(Sec or 0.1)
-                            sethiddenproperty(plr, "SimulationRadius", math.huge)
-                            v:BreakJoints()
-                            v.Humanoid.Health = 0
-                            if v:FindFirstChild("HumanoidRootPart") then 
-                                v.HumanoidRootPart.CanCollide = false 
-                            end
-                        until not _G.KillH or not v.Parent or v.Humanoid.Health <= 0
-                    end)
-                end
-            end
-        end
-    end
-end)
 
 RaidOpen:AddToggle("AwakenFruits", {
     Title = "Auto Awaken Fruit",
